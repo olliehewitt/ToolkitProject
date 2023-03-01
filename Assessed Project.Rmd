@@ -35,11 +35,11 @@ Our focus is to assess the risk of a fatal or severe injury, given that one has 
 
 # Method
 
-Our primary analysis, as outlined in the summary, will be Generalised Linear Models in R. The data provided are public domain, and include: "Road Safety Data - Accidents 2020", "Road Safety Data - Vehicles 2020" and "Road Safety Data - Casualties 2020" merged by an accident index present in all three data sets.
+Our primary analysis, as outlined in the summary, will be GLMs, fitted to the data in R. The data provided are public domain, and include: "Road Safety Data - Accidents 2020.csv", "Road Safety Data - Vehicles 2020.csv" and "Road Safety Data - Casualties 2020.csv", merged by an accident index present in all three data sets.
 
-As mentioned previously, we wouldn't assume the data is normally distributed nor would we expect the outcome or our residuals to be normally distributed - i.e. we assume that a large demographic of the UK were not involved in a traffic accident in 2020, and an even smaller demographic were involved once or multiple times. In addition, not all response variables considered in the analysis are continuous - hence GLM would be an appropriate method to use.
+As mentioned previously, we wouldn't assume the data are normally distributed nor would we expect the outcome or our residuals to be normally distributed. We assume that a large demographic of the UK were not involved in a traffic accident in 2020, and an even smaller demographic were involved once or multiple times. In addition, not all response variables considered in the analysis are continuous - hence GLM would be an appropriate method to use under this non-normality and non-continuous response assumption.
 
-With this established, we determined which GLM to use using ggplot (see Appendix, A1). There doesn't appear to be an immediate pattern or linearity in terms of the effect of speed limit on accident count, and so we may choose a standard Poisson Regression model, which is best used for modelling events where the outcomes are counts. Additionally, the Poisson Distribution is most commonly used to find the probability of events occurring within a given time interval. [1]
+With this established, we determined which link function to use in the GLM using the ggplot package (see Appendix, A1) to explore the data. There doesn't appear to be an immediate pattern or linearity in terms of the effect of speed limit on accident count, and so we may choose a standard Poisson Regression model, which is best used for modelling events where the outcomes are counts. Additionally, the Poisson Distribution is most commonly used to find the probability of events occurring within a given time interval. [1]
 
 
 (Talk about the 3 components of GLM here)
@@ -48,9 +48,8 @@ With this established, we determined which GLM to use using ggplot (see Appendix
 # Results
 
 ## Desciptive plots:
-Figure 1: Plot of Number of Accidents by Day.
 
-```{r plot, echo = FALSE}
+```{r plot, echo = FALSE, fig.cap="Bar char presenting Number of Accident by Day"}
 week_count <- accidents %>%
     group_by(day_of_week, accident_severity) %>%
     count()
@@ -84,11 +83,12 @@ A2: _glm_ function in R using the _poisson_ argument
 ```{r GLM code, echo = TRUE}
 use_in_formula <- c(
     9, 10, 13, 18, 20, 21, 22, 24, 28, 29, 30
-)
-accidents_key <- accidents[, use_in_formula]
-has.neg <- apply(accidents_key, 1, function (row) any(row < 0))
-accidents_data <- accidents_key[-which(has.neg), ]
+) # Indicies of variables we want to use
+accidents_key <- accidents[, use_in_formula] # Subset the data by key variables
+has.neg <- apply(accidents_key, 1, function (row) any(row < 0)) # Which observations have negatives in any colum?
+accidents_data <- accidents_key[-which(has.neg), ] # Remove observations with negative values
 
+# Fit GLM
 model <- glm(data = accidents_data,
              formula = accident_severity ~ .,
              poisson
