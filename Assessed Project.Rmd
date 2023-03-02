@@ -16,8 +16,11 @@ header-includes:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_chunk$set(fig.align = 'center')
+
 library(tidyverse)
 library(ggplot2)
+library(arm)
+
 accidents <- read.csv("dft-road-casualty-statistics-accident-2020.csv")
 vehicles <- read.csv("dft-road-casualty-statistics-casualty-2020.csv")
 casualties <- read.csv("dft-road-casualty-statistics-vehicle-2020.csv")
@@ -58,22 +61,33 @@ ggplot(week_count, aes(x = day_of_week, y = n, fill = accident_severity)) +
     geom_bar(stat = "identity") +
     scale_fill_manual(values = c("#999999", "#E69F00", "#56B4E9")) + xlab("Day of the Week") + ylab("Number of Accidents")
 ```
+
 ## GLM:
 
 We use the standard function _summary()_ to produce result summaries of our model which uses the _glm()_ function (see Appendix, A2 and A3).
 
-A3 is our summary of the _glm()_ function. We use this output to see which predictor variables have an effect on the response variable by the _p_ value seen in the final column _Pr(>|z|)_ - the predictor variable has an effect on the response when _p < 0.05_.
+A3 is our summary of the _glm()_ function fitting the Poisson model. We use this output to see which predictor variables have an effect on the response variable by the _p_ value seen in the final column _Pr(>|z|)_ - the predictor variable has an effect on the response when _p < 0.05_.
 
 Denote the significance of these variables by the number of stars on each row: we see that the number of vehicles involved in the accident, road type and speed limit bear the most significance on the outcome. Following not too far behind is junction detail and light conditions. Then, bearing even less significance is weather conditions. The variables with little to no effect on the response variables are: road surface conditions, first road class, second road class, and the day of the week.
 
 Ultimately, of all the predictors compared within the analysis, speed limit has the smallest _p_ value which implies a stronger relationship between accident severity and speed limit overall.
 
+We then may check if the model has under- or over-dispersion, which can still be determined in the output A3. Here, the _Residual deviance_ is smaller than the degrees of freedom, and so under-dispersion exists. This unfortunately means that some of the estimates aren't necessarily correct. 
+
+The addition of 10 independent variables, i.e. the difference in _df_ between the _Residual deviance_ and the _Null deviance_ accounted for the change in deviance from 7559.3 to 7743.6. This comparatively isn't a huge difference, and so implies a decent fit - as the greater the difference, the worse the fit. [1]
+
+We use the _quasi-poisson_ model with the hope of having a more correct standard error (see Appendix, A2 and A4), and then compare the first and second model (see Appendix, A5) where we also compute the standard errors. Observing the output of A5, the exponent of _coef1_ for _speed_limit_ is 0.9985575.
+
+```{r result, echo = TRUE}
+1-0.9985575
+```
+
+In essence, as _coef1_ for the predictor _speed_limit_ is negative, we can say that accident severity declines by 0.14% when speed limit decreases. This, however, may contradict our earlier findings which suggest a significant effect by speed limit on accident severity.
 
 \newpage
 # Appendix
 
 A1: Log Accident Count by Speed Limit
-
 ```{r, echo = FALSE}
 speed_limit_count <- accidents %>%
     group_by(speed_limit, accident_severity) %>%
@@ -86,7 +100,7 @@ ggplot(speed_limit_count %>% filter(speed_limit != -1), aes(shape = accident_sev
     xlab("Speed Limit") + ylab("Log Accident Count") 
 ```
 
-A2: _glm_ function in R using the _poisson_ argument
+A2: _glm_ function in R using the _poisson_ and _quasipoisson_ argument
 ```{r GLM code, echo = TRUE}
 # Indices of variables we want to use
 use_in_formula <- c(
@@ -97,19 +111,39 @@ accidents_key <- accidents[, use_in_formula]
 has.neg <- apply(accidents_key, 1, function (row) any(row < 0))
 # Remove observations with negative values
 accidents_data <- accidents_key[-which(has.neg), ]
-# Fit GLM
+# Fit GLM with poisson
 model <- glm(data = accidents_data,
              formula = accident_severity ~ .,
              family = poisson(link = "log"))
+# Fit GLM with quasi-poisson
+model2 <- glm(data = accidents_data,
+             formula = accident_severity ~ .,
+             family = quasipoisson(link = "log"))
 ```
 
-\newpage
-A3: Summary of the _poisson_ model
+A3: Summary of the Poisson model
 ```{r, echo = FALSE}
 summary(model)
 ```
 
+A4: Summary of the Quasi-poisson model
+```{r, echo = FALSE}
+summary(model2)
+```
 
+A5: Comparison of both models
+```{r, echo = FALSE}
+# Take coefficients from first model and second model
+coef1 = coef(model)
+coef2 = coef(model2)
+# Take standard errors from first model and second model
+se.coef1 = se.coef(model)
+se.coef2 = se.coef(model2)
+
+# Combine into one dataframe
+models.comp <- cbind(coef1, se.coef1, coef2, se.coef2, exponent = exp(coef1))
+models.comp
+```
 
 # References
 
