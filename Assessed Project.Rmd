@@ -39,7 +39,7 @@ Our primary analysis, as outlined in the summary, will be GLMs, fitted to the da
 
 As mentioned previously, we wouldn't assume the data are normally distributed nor would we expect the outcome or our residuals to be normally distributed. We assume that a large demographic of the UK were not involved in a traffic accident in 2020, and an even smaller demographic were involved once or multiple times. In addition, not all response variables considered in the analysis are continuous - hence GLM would be an appropriate method to use under this non-normality and non-continuous response assumption.
 
-With this established, we determined which link function to use in the GLM using the ggplot package (see Appendix, A1) to explore the data. There doesn't appear to be an immediate pattern or linearity in terms of the effect of speed limit on accident count, and so we may choose a standard Poisson Regression model, which is best used for modelling events where the outcomes are counts. Additionally, the Poisson Distribution is most commonly used to find the probability of events occurring within a given time interval. [1]
+With this established, we determined which link function to use in the GLM using the ggplot package (see Appendix, A1) to explore the data. There doesn't appear to be an immediate pattern or linearity in terms of the effect of speed limit on accident count, and so we may choose a standard Poisson Regression model, which is best used for modelling events where the outcomes are counts. Additionally, the Poisson Distribution is most commonly used to find the probability of events occurring within a given time interval [1]. We use the canonical link function, which in the case of Poisson regression is the log-link function.
 
 
 (Talk about the 3 components of GLM here)
@@ -91,7 +91,7 @@ accidents_data <- accidents_key[-which(has.neg), ] # Remove observations with ne
 # Fit GLM
 model <- glm(data = accidents_data,
              formula = accident_severity ~ .,
-             poisson
+             family = poisson(link = "log")
              )
 ```
 
