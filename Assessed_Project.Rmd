@@ -1,0 +1,215 @@
+---
+title: "MAS61004 - Assessed Project"
+author: "Allan Cousins, Matthew Knowles, Oliver Hewitt"
+date: "2/23/2023"
+output:
+  pdf_document: 
+    number_sections: true
+  html_document: 
+    number_sections: true
+fontsize: 11pt
+urlcolor: blue
+header-includes:
+  - \usepackage{bm}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(ggplot2)
+library(purrr)
+set.seed(5)
+
+accidents <- read.csv("dft-road-casualty-statistics-accident-2020.csv")
+casualty <- read.csv("dft-road-casualty-statistics-casualty-2020.csv")
+vehicles <- read.csv("dft-road-casualty-statistics-vehicle-2020.csv")
+
+# We begin by converting to a binary variable by severity. Accidents with a severity of 1 stay as such, and others are converted to a 0. 
+accidents <- accidents %>% 
+  mutate(bin_severity = ifelse(.data$accident_severity == 1, 1, 0))
+```
+
+
+# Executive Summary
+
+Motivation for the investigation: to understand the relationship between speed limit (plus other factors) and accident severity. 
+
+Our focus is to assess the risk of a fatal or severe injury, given that one has already occurred - using road safety data exclusively from the year 2020. Analysis in the report will be carried out in R using Generalised Linear Models (GLMs), as it would be incorrect to assume the data is normally distributed.
+
+(Outline conclusions here)
+
+# Introduction
+
+The main purpose of this investigation is to describe the relationship primarily between accident severity and speed limit, and other factors included in the data provided by the UK Government's Department for Transport. The data provided are public domain, and include: "Road Safety Data - Accidents 2020.csv", "Road Safety Data - Vehicles 2020.csv" and "Road Safety Data - Casualties 2020.csv", merged by an accident index present in all three data sets.
+
+Accident severity is categorised as either "fatal", "serious" or "slight", and the aim is to conduct the analysis treating it as a binary variable - i.e. grouping severity into one of two categories, "fatal or serious" and "slight". With this, it effectively eliminates a number of ways to analyse the data, but has potential to give more accurate results given the correct statistical application.
+
+Some primary objectives of this investigation:
+
+* Out of a select few variables in all three data sets (including speed limit), which have the most impact on accident severity when they change slightly?
+
+* Assess the accuracy of the model used to fit the data, and how appropriate it is.
+
+The explanation as to why the model was used will be outlined in the Method, along the corresponding R code or summary outputs found in the Appendix. The Results section will be an interpretation of the outputs from the model, and some relevant visualizations of the data. Ultimately, both of the above points will be reviewed (with the help of the Method and the Results).
+
+# Method
+
+Our primary analysis, as outlined in the summary, will be GLMs fitted to the data in R. We firstly aim to build a model that predicts accident severity based on speed limit.
+
+Initially cleaning and preparing the data was important, and we remove any values with -1 as to not impede on the results of the GLM. The Vehicles and Casualties data each contain three variables including the accident index, which will be merged onto the Accidents data (see Appendix, A1).
+
+As mentioned previously, we wouldn't assume the data are normally distributed nor would we expect the outcome of our residuals to be normally distributed. We assume that a large demographic of the UK were not involved in a traffic accident in 2020, and an even smaller demographic were involved once or multiple times. In addition, not all response variables considered in the analysis are continuous - hence GLM would be an appropriate method to use under this non-normality and non-continuous response assumption.
+
+We determined that Logistic Regression with a logit link function was the most appropriate method, given the use of dichotomous data (as we need accident severity to have two possible outcomes in our case). In R, we altered the data frame to have a binary response variable with two classes, as opposed to three.
+
+With the final data frame created in A1, we then need assess to how well the model works on new data. For the purposes of this investigation, we will subset this data. We can split the data, and train the model using about 80% of the data – and call it our training set. The remaining 20% we use as our independent test set. Ultimately, this is to train the model on just the training set, and then see how well this predicts the other data (see Appendix, A2).
+
+We fit the GLM to the training data and specify that the response variable is binomial, using a logit link function (see Appendix, A3). We train the model on all predictor variables, but initially observe the model with exclusively one predictor variable being the speed limit, where we consider odds ratio and it's exponent - to measure the association between speed limit ad accident severity alone. In Logistic Regression, the exponential function of the regression coefficient is the odds ratio associated with a one-unit increase in the exposure. [3]
+
+\newpage
+# Results
+
+## Descriptive plots:
+
+```{r plot, echo = FALSE, fig.cap="Bar chart presenting Number of Accident by Day"}
+week_count <- accidents %>%
+    group_by(day_of_week, bin_severity) %>%
+    count()
+week_count$day_of_week <- as.factor(week_count$day_of_week)
+week_count$bin_severity <- as.factor(week_count$bin_severity)
+levels(week_count$day_of_week) <- c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+ggplot(week_count, aes(x = day_of_week, y = n, fill = bin_severity)) +
+    geom_bar(stat = "identity") +
+    scale_fill_manual(values = c("#999999", "#E69F00", "#56B4E9")) + xlab("Day of the Week") + ylab("Number of Accidents")
+```
+
+\newpage
+## GLM:
+
+We use the standard function _summary()_ to produce result summaries of our model which uses the _glm()_ function, considering all predictor variables (see Appendix, A3).
+
+A4 is our summary of the _glm()_ function fitting the Binomial model with all predictor variables (A3). We use this output to see which predictor variables have an effect on the response variable by the _p_ value seen in the final column _Pr(>|z|)_ - the predictor variable has an effect on the response when _p < 0.05_.
+
+Denote the significance of these variables by the number of stars on each row: we see that the sex of the driver involved in the accident, light conditions and speed limit bear the most significance on the outcome. However, these results can be misleading, as they may be neither statistically significant nor practically important. [1]
+
+For now, we will assess in a little bit more depth the GLM function using just _speed_limit_ as a predictor variable (see Appendix, A5). We then observe the summary output and focus on the coefficients (see Appendix, A6): the coefficient of the variable _speed_limit_ is 0.043836, and as it's positive it can be deduced that the chance of observing a "fatal or serious" accident increases with a higher speed limit on the road. From here we can the exponent of this value to obtain the odds ratio value 1.044747 (see Appendix, A7).
+
+In essence, for every unit increase in the speed limit of the road, the odd ratio increases on average a constant factor of roughly 4.47%. Then, we construct a 95% confidence interval for the estimated model coefficient and take the exponent of this result. [2]
+
+This implies that with a 95% confidence interval, for every unit increase in speed limit the observation of a "fatal or serious" accident becomes between roughly 4.24% and 4.71% more likely (see Appendix, A8).
+
+
+
+\newpage
+# Appendix
+
+A1: Cleaning and compilation of the main data frame
+```{r, dataframe, echo = TRUE}
+# We begin by converting to a binary variable by severity.
+# Accidents with a severity of 1 stay as such, and others are converted to a 0. 
+accidents <- accidents %>% 
+  mutate(bin_severity = ifelse(.data$accident_severity == 1, 1, 0))
+
+sub_accidents <- accidents %>%
+    select(
+        "ï..accident_index",
+        "bin_severity",
+        "day_of_week",
+        "road_type",
+        "speed_limit",
+        "light_conditions",
+        "weather_conditions",
+        "road_surface_conditions"
+    )
+
+sub_vehicles <- vehicles %>% 
+    select(
+        "ï..accident_index",
+        "sex_of_driver",
+        "age_band_of_driver"
+    )
+
+sub_casualties <- casualty %>% 
+    select(
+        "ï..accident_index",
+        "sex_of_casualty",
+        "age_band_of_casualty"
+    )
+
+df_sub <- merge.data.frame(sub_vehicles, sub_casualties, by = "ï..accident_index")
+df_sub_unique <- unique(df_sub)
+df <- merge.data.frame(sub_accidents, df_sub_unique, by = "ï..accident_index")
+
+
+# We want all variables, except speed limit, to be factors. 
+
+df <- df %>%
+    mutate(across(c(where(is.numeric), -speed_limit), as.factor))
+
+df$bin_severity <- as.factor(df$bin_severity)
+
+# We need to remove any rows in which there is a -1 in a column of the data.
+
+has.neg <- apply(df, 1, function(row) any(row == -1))
+df <- df[-which(has.neg), ] %>% 
+    select(-ï..accident_index)
+```
+
+A2: Training and test data
+```{r, train and test data sets, echo = TRUE}
+df$id <- 1:nrow(df)
+df_train <- df %>% sample_frac(0.8)
+df_test <- anti_join(df, df_train, by = "id")
+```
+
+A3: _glm_ function in R using the _binomial_ argument with the training data
+```{r GLM code A3, echo = TRUE}
+fit <- glm(
+    data = df_train,
+    formula = bin_severity ~ .,
+    family = binomial(link = "logit")
+)
+```
+
+A4: Summary of A3
+```{r GLM code A4, echo = TRUE}
+summary(fit)
+```
+
+A5: _glm_ function in R using the _binomial_ argument with the training data, using exclusively the predictor variable _speed_limit_
+```{r GLM code A5, echo = TRUE}
+fit_spd_lim <- glm(
+    data = df_train,
+    formula = bin_severity ~ speed_limit,
+    family = binomial(link = "logit")
+)
+```
+
+A6: Summary of A5
+```{r GLM code A6, echo = TRUE}
+summary(fit_spd_lim)
+```
+
+A7: Odds ratio, using the coefficent of speed limit from A6
+```{r odds ratio, echo = TRUE, include = TRUE}
+exp(coefficients(fit_spd_lim)[2])
+```
+
+A8: Construction of a 95% confidence interval for the speed limit coefficient (using A5 and A6) 
+```{r exp of 95% confidence interval, echo = TRUE, include = TRUE}
+confint.default(fit_spd_lim)[2,]
+
+exp(confint.default(fit_spd_lim)[2,])
+```
+
+
+# References
+
+[1] Gelman, A., Stern, H. (2006): "The Difference Between “Significant” and “Not Significant” is not
+Itself Statistically Significant"
+
+[2] Hartmann, K., Krois, J., Waske, B. (2018): E-Learning Project SOGA: Statistics and Geospatial Data Analysis. Department of Earth Sciences, Freie Universitaet Berlin.
+
+[3] Szumilas M. (2010). Explaining odds ratios. Journal of the Canadian Academy of Child and Adolescent Psychiatry = Journal de l'Academie canadienne de psychiatrie de l'enfant et de l'adolescent, 19(3), 227–229.
+
