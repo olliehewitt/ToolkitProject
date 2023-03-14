@@ -27,7 +27,7 @@ vehicles <- read.csv("dft-road-casualty-statistics-vehicle-2020.csv")
 
 # We begin by converting to a binary variable by severity. Accidents with a severity of 1 stay as such, and others are converted to a 0. 
 accidents <- accidents %>% 
-  mutate(bin_severity = ifelse(.data$accident_severity == 1, 1, 0))
+  mutate(bin_severity = ifelse(.data$accident_severity == 3, 0, 1))
 ```
 
 
@@ -72,17 +72,55 @@ We fit the GLM to the training data and specify that the response variable is bi
 
 ## Descriptive plots:
 
-```{r plot, echo = FALSE, fig.cap="Bar chart presenting Number of Accident by Day"}
+```{r plot, echo = FALSE, fig.cap="Bar chart presenting Number of Accidents by Day"}
 week_count <- accidents %>%
     group_by(day_of_week, bin_severity) %>%
     count()
+
 week_count$day_of_week <- as.factor(week_count$day_of_week)
 week_count$bin_severity <- as.factor(week_count$bin_severity)
 levels(week_count$day_of_week) <- c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+
 ggplot(week_count, aes(x = day_of_week, y = n, fill = bin_severity)) +
     geom_bar(stat = "identity") +
-    scale_fill_manual(values = c("#999999", "#E69F00", "#56B4E9")) + xlab("Day of the Week") + ylab("Number of Accidents")
+    #scale_fill_manual(values = c("#999999", "#E69F00", "#56B4E9")) + xlab("Day of the Week") + ylab("Number of Accidents") +
+    scale_fill_discrete(name = "Accident Severity",
+                        labels = c("Slight", "Fatal or Serious")) +
+    labs(x = "Day of the Week", y = "Number of Accidents",
+       title = "Figure 1: Number of Accidents by Day",
+       subtitle = "Road traffic accidents occur later in the weekday, and noticeably less on the weekend.",
+       caption = "Source: UK Government (2020)") 
 ```
+
+We start with a visualization of exclusively the Accidents data. From Monday to Friday, there is a relatively linear increase in the number of accidents occurred during the week: we see a 19.4% increase in "fatal or serious" accidents, and a 15.8% increase in "slight" accidents from the very start of the week to Friday. For all accident severities, we see a very similar rate of increase throughout the weekdays.
+
+Although it is a little bit harder to visualize, the "slight" accidents present a more significant decrease from Saturday to Sunday with 17.6%, rather than the "fatal or serious" accidents with a 12.2% decrease.
+
+For both categories seen in Figure 1, the weekend accident data does not conspire with the linear trend seen with the weekday data. The reason for this is not likely to be accounted for by the speed limit, as this is not likely to change depending on the day of the week.
+
+\newpage
+The density plot below considers only speed limit with regards to accident severity:
+
+```{r plot two, echo = FALSE}
+accident.data.initial <- accidents %>%
+  mutate(bin_severity_plot = ifelse(.data$accident_severity == 3, "Slight", "Fatal or Serious"))
+
+# Remove missing data
+accident.data <- subset(accident.data.initial, speed_limit != -1) %>% na.omit(accident_severity)
+
+ggplot(accident.data, aes(x = speed_limit, y = after_stat(density)))+
+  labs(x = "Speed Limit (mph)", y = "Density") +
+    labs(x = "Day of the Week", y = "Number of Accidents",
+       title = "Figure 2: Number of Accidents by Speed Limit (mph)",
+       subtitle = "Density plot of speed limit against severity following a non-normal distribution",
+       caption = "Source: UK Government (2020)") + 
+  geom_histogram(binwidth=5) +
+  facet_grid(col = vars(bin_severity_plot),
+             labeller =
+               )
+```
+
+We have a good feel of how the data is distributed in this plot. Looking at speed limits above the mean, i.e. 30 mph for both classifications, we have a slightly higher density for speed limits $\ge$ 40 in the "Fatal or Serious" category - particular at the 60mph limits which are applicable to cars (not towing caravans or trailers) on single carriageways. There is evidence to suggest that consistently more severe accidents have occurred in areas with a higher speed limit, and (in effect) at higher speeds.
 
 \newpage
 ## GLM:
@@ -93,23 +131,23 @@ A4 is our summary of the _glm()_ function fitting the Binomial model with all pr
 
 Denote the significance of these variables by the number of stars on each row: we see that the sex of the driver involved in the accident, light conditions and speed limit bear the most significance on the outcome. However, these results can be misleading, as they may be neither statistically significant nor practically important. [1]
 
-For now, we will assess in a little bit more depth the GLM function using just _speed_limit_ as a predictor variable (see Appendix, A5). We then observe the summary output and focus on the coefficients (see Appendix, A6): the coefficient of the variable _speed_limit_ is 0.043836, and as it's positive it can be deduced that the chance of observing a "fatal or serious" accident increases with a higher speed limit on the road. From here we can the exponent of this value to obtain the odds ratio value 1.044747 (see Appendix, A7).
+For now, we will assess in a little bit more depth the GLM function using just _speed_limit_ as a predictor variable (see Appendix, A5). We then observe the summary output and focus on the coefficients (see Appendix, A6): the coefficient of the variable _speed_limit_ is 0.018851, and as it's positive it can be deduced that the chance of observing a "fatal or serious" accident increases with a higher speed limit on the road. From here we can the exponent of this value to obtain the odds ratio value 1.019029 (see Appendix, A7).
 
-In essence, for every unit increase in the speed limit of the road, the odd ratio increases on average a constant factor of roughly 4.47%. Then, we construct a 95% confidence interval for the estimated model coefficient and take the exponent of this result. [2]
+In essence, for every unit increase in the speed limit of the road, the odd ratio increases on average a constant factor of roughly 1.9%. Then, we construct a 95% confidence interval for the estimated model coefficient and take the exponent of this result. [2]
 
-This implies that with a 95% confidence interval, for every unit increase in speed limit the observation of a "fatal or serious" accident becomes between roughly 4.24% and 4.71% more likely (see Appendix, A8).
-
-
+This implies that with a 95% confidence interval, for every unit increase in speed limit the observation of a "fatal or serious" accident becomes between roughly 1.82% and 1.99% more likely (see Appendix, A8).
 
 \newpage
 # Appendix
 
 A1: Cleaning and compilation of the main data frame
 ```{r, dataframe, echo = TRUE}
+set.seed(5)
+
 # We begin by converting to a binary variable by severity.
 # Accidents with a severity of 1 stay as such, and others are converted to a 0. 
 accidents <- accidents %>% 
-  mutate(bin_severity = ifelse(.data$accident_severity == 1, 1, 0))
+  mutate(bin_severity = ifelse(.data$accident_severity == 3, 0, 1))
 
 sub_accidents <- accidents %>%
     select(
@@ -212,4 +250,3 @@ Itself Statistically Significant"
 [2] Hartmann, K., Krois, J., Waske, B. (2018): E-Learning Project SOGA: Statistics and Geospatial Data Analysis. Department of Earth Sciences, Freie Universitaet Berlin.
 
 [3] Szumilas M. (2010). Explaining odds ratios. Journal of the Canadian Academy of Child and Adolescent Psychiatry = Journal de l'Academie canadienne de psychiatrie de l'enfant et de l'adolescent, 19(3), 227–229.
-
